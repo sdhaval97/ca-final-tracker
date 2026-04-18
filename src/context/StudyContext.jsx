@@ -62,28 +62,30 @@ export function StudyProvider({ children }) {
   const loadCloudData = useCallback(async (user) => {
     isLoadingFromCloud.current = true;
     try {
+      // Wipe stale local data before loading so the cloud is always the source of truth
+      ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex'].forEach(k =>
+        localStorage.removeItem('caf3_' + k)
+      );
+
       const [profile, userData] = await Promise.all([
         fetchProfile(user.id),
         fetchUserData(user.id),
       ]);
 
-      if (profile?.name) setUName(profile.name);
-      if (profile?.exam_date) setExamDt(profile.exam_date);
-
-      if (userData) {
-        if (userData.log?.length)        setLog(userData.log);
-        if (userData.ch_states)          setChS(userData.ch_states);
-        if (userData.rv_states)          setRvS(userData.rv_states);
-        if (userData.todos?.length)      setTodos(userData.todos);
-        if (userData.targets)            setTgs(userData.targets);
-        if (userData.rewards?.length)    setRws(userData.rewards);
-        if (userData.streak)             setStreak(userData.streak);
-        if (userData.last_study_date)    setLastD(userData.last_study_date);
-      }
+      // Always overwrite — no conditional checks — so stale local data never wins
+      setUName(profile?.name ?? '');
+      setExamDt(profile?.exam_date ?? '');
+      setLog(userData?.log ?? []);
+      setChS(userData?.ch_states ?? {});
+      setRvS(userData?.rv_states ?? {});
+      setTodos(userData?.todos ?? []);
+      setTgs(userData?.targets ?? {});
+      setRws(userData?.rewards ?? []);
+      setStreak(userData?.streak ?? 0);
+      setLastD(userData?.last_study_date ?? '');
     } catch (e) {
       console.warn('Could not load cloud data, using local cache:', e.message);
     } finally {
-      // Delay clearing the flag so the sync effect skips the initial state flush
       setTimeout(() => { isLoadingFromCloud.current = false; }, 1000);
     }
   }, []);
