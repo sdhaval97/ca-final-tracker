@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { supabase } from '../lib/supabase';
-import { fetchProfile, fetchUserData, upsertProfile, upsertUserData, logAuthEvent } from '../lib/sync';
+import { fetchProfile, fetchUserData, upsertProfile, upsertUserData } from '../lib/sync';
 
 const StudyContext = createContext(null);
 
@@ -119,8 +119,6 @@ export function StudyProvider({ children }) {
       } else if (event === 'SIGNED_IN') {
         setAuthUser(session.user);
         await loadCloudData(session.user);
-        const isNewUser = Date.now() - new Date(session.user.created_at).getTime() < 60_000;
-        await logAuthEvent(session.user.id, isNewUser ? 'sign_up' : 'sign_in');
       } else if (event === 'PASSWORD_RECOVERY') {
         setAuthUser(session.user);
         setIsPasswordRecovery(true);

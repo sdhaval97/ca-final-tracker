@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useStudy } from '../context/StudyContext';
 import { SUBS } from '../data/subjects';
-import { fetchRecentAuthEvents } from '../lib/sync';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { LogOut, Pencil, Check, X, Shield, Smartphone, Monitor } from 'lucide-react';
+import { LogOut, Pencil, Check, X, Shield } from 'lucide-react';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -16,28 +15,6 @@ function initials(name) {
 function formatDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function formatDateTime(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-IN', {
-    day: 'numeric', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-}
-
-function deviceIcon(ua = '') {
-  if (/mobile|android|iphone/i.test(ua)) return <Smartphone size={13} />;
-  return <Monitor size={13} />;
-}
-
-function browserName(ua = '') {
-  if (ua.includes('Firefox'))     return 'Firefox';
-  if (ua.includes('Edg'))         return 'Edge';
-  if (ua.includes('OPR'))         return 'Opera';
-  if (ua.includes('Chrome'))      return 'Chrome';
-  if (ua.includes('Safari'))      return 'Safari';
-  return 'Unknown browser';
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -65,21 +42,9 @@ export function Profile() {
   const [editName, setEditName] = useState(uName);
   const [editExam, setEditExam] = useState(examDt);
   const [editPhone, setEditPhone] = useState(phone);
-  // Auth events
-  const [events, setEvents] = useState([]);
-  const [eventsLoading, setEventsLoading] = useState(true);
-
   // Reset confirmation
   const [resetInput, setResetInput] = useState('');
   const [showReset, setShowReset] = useState(false);
-
-  useEffect(() => {
-    if (!authUser) return;
-    fetchRecentAuthEvents(authUser.id)
-      .then(setEvents)
-      .catch(() => setEvents([]))
-      .finally(() => setEventsLoading(false));
-  }, [authUser]);
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const totalHours = +(log.reduce((s, l) => s + l.minutes, 0) / 60).toFixed(1);
@@ -220,41 +185,8 @@ export function Profile() {
         </Card>
       </div>
 
-      {/* ── Recent Sign-in Activity ──────────────────────────────────────── */}
-      <div>
-        <h3 className="text-[11px] font-black text-txM uppercase tracking-wider mb-3">Recent Activity</h3>
-        <Card noPadding>
-          {eventsLoading ? (
-            <div className="px-5 py-4 text-xs text-txM font-medium">Loading…</div>
-          ) : events.length === 0 ? (
-            <div className="px-5 py-4 text-xs text-txM font-medium">No activity recorded yet.</div>
-          ) : (
-            <div className="divide-y divide-brd">
-              {events.map(ev => (
-                <div key={ev.id} className="flex items-center gap-3 px-5 py-3">
-                  <div className={`px-2 py-0.5 rounded-full text-[10px] font-black flex-shrink-0 ${
-                    ev.event_type === 'sign_up'
-                      ? 'bg-emBg text-em border border-em/20'
-                      : 'bg-b0 text-b6 border border-b3'
-                  }`}>
-                    {ev.event_type === 'sign_up' ? 'Sign Up' : 'Sign In'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-tx">{formatDateTime(ev.created_at)}</p>
-                    {ev.metadata?.ua && (
-                      <p className="text-[11px] text-txM font-medium flex items-center gap-1 mt-0.5">
-                        {deviceIcon(ev.metadata.ua)} {browserName(ev.metadata.ua)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
 
-      {/* ── Account Actions ──────────────────────────────────────────────── */}
+{/* ── Account Actions ──────────────────────────────────────────────── */}
       <div>
         <h3 className="text-[11px] font-black text-txM uppercase tracking-wider mb-3">Account</h3>
         <Card>
