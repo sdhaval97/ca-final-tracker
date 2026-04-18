@@ -144,6 +144,17 @@ export function StudyProvider({ children }) {
     syncToCloud();
   }, [syncToCloud]);
 
+  // Re-fetch from cloud when tab regains focus (picks up changes from other devices)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && authUser && !isLoadingFromCloud.current) {
+        loadCloudData(authUser);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [authUser, loadCloudData]);
+
   // Flush on tab/browser close
   useEffect(() => {
     const flush = () => {
