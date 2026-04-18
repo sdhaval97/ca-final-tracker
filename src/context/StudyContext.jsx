@@ -92,8 +92,12 @@ export function StudyProvider({ children }) {
 
   // ── Auth listener ───────────────────────────────────────────────────────────
   useEffect(() => {
+    // Safety net: if Supabase never fires (e.g. lock error, missing env vars), unblock the UI
+    const timeout = setTimeout(() => setAuthLoading(false), 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'INITIAL_SESSION') {
+        clearTimeout(timeout);
         if (session?.user) {
           await loadCloudData(session.user);
           setAuthUser(session.user);
