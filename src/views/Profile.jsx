@@ -64,8 +64,6 @@ export function Profile() {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(uName);
   const [editExam, setEditExam] = useState(examDt);
-  const [saving, setSaving] = useState(false);
-
   // Auth events
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -101,12 +99,10 @@ export function Profile() {
   });
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = () => {
     if (!editName.trim()) return;
-    setSaving(true);
-    await saveProfile(editName.trim(), editExam);
-    setSaving(false);
     setEditing(false);
+    saveProfile(editName.trim(), editExam); // state updates synchronously; network call runs in background
   };
 
   const handleReset = () => {
@@ -141,8 +137,8 @@ export function Profile() {
                   className="bg-bg3 border border-brd rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-b4 w-full"
                 />
                 <div className="flex gap-2 mt-1">
-                  <Button onClick={handleSaveProfile} disabled={saving} className="py-1.5 px-4 text-xs rounded-full shadow-sB flex items-center gap-1.5">
-                    <Check size={12} /> {saving ? 'Saving…' : 'Save'}
+                  <Button onClick={handleSaveProfile} className="py-1.5 px-4 text-xs rounded-full shadow-sB flex items-center gap-1.5">
+                    <Check size={12} /> Save
                   </Button>
                   <Button variant="secondary" onClick={() => { setEditing(false); setEditName(uName); setEditExam(examDt); }} className="py-1.5 px-4 text-xs rounded-full flex items-center gap-1.5">
                     <X size={12} /> Cancel

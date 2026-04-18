@@ -99,6 +99,17 @@ export function StudyProvider({ children }) {
       if (event === 'INITIAL_SESSION') {
         clearTimeout(timeout);
         if (session?.user) {
+          // Verify the JWT is still valid (catches deleted-user stale sessions)
+          const { error: userError } = await supabase.auth.getUser();
+          if (userError) {
+            // Stale / revoked session — clear everything and show login
+            try { await supabase.auth.signOut(); } catch (_) {}
+            ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex', 'bu'].forEach(k =>
+              localStorage.removeItem('caf3_' + k)
+            );
+            setAuthLoading(false);
+            return;
+          }
           await loadCloudData(session.user);
           setAuthUser(session.user);
         }
@@ -180,7 +191,7 @@ export function StudyProvider({ children }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try { await supabase.auth.signOut(); } catch (_) { /* stale session — still clear below */ }
     ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex', 'bu'].forEach(k =>
       localStorage.removeItem('caf3_' + k)
     );
