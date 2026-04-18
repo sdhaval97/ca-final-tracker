@@ -28,6 +28,21 @@ export function AuthModal({ isOpen }) {
   const [status, setStatus] = useState('idle'); // idle | loading | sent | error
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Detect Supabase auth error redirects (e.g. expired magic link) and clean the URL
+  React.useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.includes('error=')) return;
+    const params = new URLSearchParams(hash.slice(1));
+    const code = params.get('error_code');
+    if (code === 'otp_expired') {
+      setErrorMsg('That magic link has expired. Enter your email to get a new one.');
+    } else {
+      const desc = params.get('error_description');
+      setErrorMsg(desc ? desc.replace(/\+/g, ' ') : 'Sign-in failed. Please try again.');
+    }
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
+
   if (!isOpen) return null;
 
   const handleSend = async () => {
@@ -172,7 +187,7 @@ export function BuddyModal({ isOpen, onClose }) {
       data.subjects[s.id] = { done: d, total: s.ch.length };
     });
     
-    const enc = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    const enc = btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(data))));
     let msg = `🎓 CA ${data.name}'s Study Progress\n━━━━━━━━━━━━━━━━━━━━\n📊 Total: ${data.totalHrs}h\n☀️ Today: ${data.todayHrs}h\n🔥 ${data.streak} day streak\n\nCABUDDY:${enc}`;
     
     navigator.clipboard.writeText(msg).then(() => alert('✅ Copied! Send to your buddy via WhatsApp.')).catch(()=>alert('Could not copy automatically.'));
@@ -182,7 +197,7 @@ export function BuddyModal({ isOpen, onClose }) {
     const match = pasteData.match(/CABUDDY:([A-Za-z0-9+/=]+)/);
     if(!match) { alert('Invalid data!'); return; }
     try {
-      const data = JSON.parse(decodeURIComponent(escape(atob(match[1]))));
+      const data = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(match[1]), c => c.charCodeAt(0))));
       if(!data.name) throw new Error();
       setBuddy(data);
       setPasteData('');
