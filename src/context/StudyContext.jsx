@@ -5,10 +5,17 @@ import { fetchProfile, fetchUserData, upsertProfile, upsertUserData, logAuthEven
 
 const StudyContext = createContext(null);
 
+const WIPE_KEYS = ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex', 'bu', 'ph'];
+
+function wipeLocal() {
+  WIPE_KEYS.forEach(k => localStorage.removeItem('caf3_' + k));
+}
+
 export function StudyProvider({ children }) {
   // ── Auth state ──────────────────────────────────────────────────────────────
   const [authUser, setAuthUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   // ── Study data (localStorage-backed) ───────────────────────────────────────
   const [log, setLog] = useLocalStorage('log', []);
@@ -22,6 +29,7 @@ export function StudyProvider({ children }) {
   const [uName, setUName] = useLocalStorage('nm', '');
   const [buddy, setBuddy] = useLocalStorage('bu', null);
   const [examDt, setExamDt] = useLocalStorage('ex', '');
+  const [phone, setPhone] = useLocalStorage('ph', '');
 
   // ── Timer state ─────────────────────────────────────────────────────────────
   const [tRun, setTRun] = useState(false);
@@ -62,19 +70,14 @@ export function StudyProvider({ children }) {
   const loadCloudData = useCallback(async (user) => {
     isLoadingFromCloud.current = true;
     try {
-      // Wipe stale local data before loading so the cloud is always the source of truth
-      ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex', 'bu'].forEach(k =>
-        localStorage.removeItem('caf3_' + k)
-      );
-
+      wipeLocal();
       const [profile, userData] = await Promise.all([
         fetchProfile(user.id),
         fetchUserData(user.id),
       ]);
-
-      // Always overwrite — no conditional checks — so stale local data never wins
       setUName(profile?.name ?? '');
       setExamDt(profile?.exam_date ?? '');
+      setPhone(profile?.phone ?? '');
       setLog(userData?.log ?? []);
       setChS(userData?.ch_states ?? {});
       setRvS(userData?.rv_states ?? {});
@@ -88,26 +91,24 @@ export function StudyProvider({ children }) {
     } finally {
       setTimeout(() => { isLoadingFromCloud.current = false; }, 1000);
     }
+  // useState setters are stable refs — safe to omit from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Auth listener ───────────────────────────────────────────────────────────
   useEffect(() => {
-    // Safety net: if Supabase never fires (e.g. lock error, missing env vars), unblock the UI
     const timeout = setTimeout(() => setAuthLoading(false), 5000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'INITIAL_SESSION') {
         clearTimeout(timeout);
         if (session?.user) {
-          // refreshSession hits the server and requires the refresh token to still be valid.
-          // Supabase revokes refresh tokens when a user is deleted, so this catches ghost sessions
-          // even when the short-lived access token (JWT) hasn't expired yet.
+          // refreshSession requires the refresh token which Supabase revokes on user deletion,
+          // catching ghost sessions even when the JWT hasn't expired yet.
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
           if (refreshError || !refreshData?.session) {
-            try { await supabase.auth.signOut(); } catch (_) {}
-            ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex', 'bu'].forEach(k =>
-              localStorage.removeItem('caf3_' + k)
-            );
+            try { await supabase.auth.signOut(); } catch { /* stale session */ }
+            wipeLocal();
             setAuthLoading(false);
             return;
           }
@@ -118,9 +119,12 @@ export function StudyProvider({ children }) {
       } else if (event === 'SIGNED_IN') {
         setAuthUser(session.user);
         await loadCloudData(session.user);
-        // Detect sign_up vs sign_in by checking how recently the account was created
         const isNewUser = Date.now() - new Date(session.user.created_at).getTime() < 60_000;
         await logAuthEvent(session.user.id, isNewUser ? 'sign_up' : 'sign_in');
+      } else if (event === 'PASSWORD_RECOVERY') {
+        setAuthUser(session.user);
+        setIsPasswordRecovery(true);
+        setAuthLoading(false);
       } else if (event === 'SIGNED_OUT') {
         setAuthUser(null);
         setAuthLoading(false);
@@ -137,14 +141,8 @@ export function StudyProvider({ children }) {
     syncDebounceRef.current = setTimeout(async () => {
       try {
         await upsertUserData(authUser.id, {
-          log,
-          ch_states: chS,
-          rv_states: rvS,
-          todos,
-          targets: tgs,
-          rewards: rws,
-          streak,
-          last_study_date: lastD,
+          log, ch_states: chS, rv_states: rvS, todos,
+          targets: tgs, rewards: rws, streak, last_study_date: lastD,
         });
       } catch (e) {
         console.warn('Sync failed:', e.message);
@@ -152,11 +150,9 @@ export function StudyProvider({ children }) {
     }, 5000);
   }, [authUser, log, chS, rvS, todos, tgs, rws, streak, lastD]);
 
-  useEffect(() => {
-    syncToCloud();
-  }, [syncToCloud]);
+  useEffect(() => { syncToCloud(); }, [syncToCloud]);
 
-  // Re-fetch from cloud when tab regains focus (picks up changes from other devices)
+  // Re-fetch from cloud when tab regains focus
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && authUser && !isLoadingFromCloud.current) {
@@ -183,34 +179,60 @@ export function StudyProvider({ children }) {
   }, [authUser, log, chS, rvS, todos, tgs, rws, streak, lastD]);
 
   // ── Auth functions ──────────────────────────────────────────────────────────
-  const signIn = async (email) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
+
+  const signUp = async (email, password, firstName, lastName, phoneNum) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    const name = `${firstName.trim()} ${lastName.trim()}`.trim();
+    if (data.user) {
+      try {
+        await upsertProfile(data.user.id, { name, examDate: '', phone: phoneNum || null });
+        setUName(name);
+        if (phoneNum) setPhone(phoneNum);
+      } catch (e) {
+        console.warn('Profile save after signup:', e.message);
+      }
+    }
+    return data;
+  };
+
+  const signInWithPassword = async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  };
+
+  const resetPassword = async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
     });
     if (error) throw error;
   };
 
+  const updatePassword = async (newPassword) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    setIsPasswordRecovery(false);
+  };
+
   const signOut = async () => {
-    try { await supabase.auth.signOut(); } catch (_) { /* stale session — still clear below */ }
-    ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex', 'bu'].forEach(k =>
-      localStorage.removeItem('caf3_' + k)
-    );
+    try { await supabase.auth.signOut(); } catch { /* stale session */ }
+    wipeLocal();
     setAuthUser(null);
   };
 
-  // Saves name (+optional examDate) locally and to Supabase profiles table
-  const saveProfile = useCallback(async (name, examDate) => {
+  const saveProfile = useCallback((name, examDate, newPhone) => {
     setUName(name);
     if (examDate !== undefined) setExamDt(examDate);
+    if (newPhone !== undefined) setPhone(newPhone);
     if (authUser) {
-      try {
-        await upsertProfile(authUser.id, { name, examDate: examDate ?? examDt });
-      } catch (e) {
-        console.warn('Could not save profile:', e.message);
-      }
+      upsertProfile(authUser.id, {
+        name,
+        examDate: examDate ?? examDt,
+        phone: newPhone ?? phone,
+      }).catch(e => console.warn('Could not save profile:', e.message));
     }
-  }, [authUser, examDt]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser, examDt, phone]);
 
   // ── Timer functions ─────────────────────────────────────────────────────────
   const startTimer = (subId) => {
@@ -265,11 +287,12 @@ export function StudyProvider({ children }) {
   return (
     <StudyContext.Provider value={{
       // Auth
-      authUser, authLoading, signIn, signOut, saveProfile,
+      authUser, authLoading, isPasswordRecovery,
+      signUp, signInWithPassword, resetPassword, updatePassword, signOut, saveProfile,
       // Study data
       log, setLog, chS, setChS, rvS, setRvS, todos, setTodos,
       tgs, setTgs, rws, setRws, streak, setStreak, lastD, setLastD,
-      uName, setUName, buddy, setBuddy, examDt, setExamDt,
+      uName, setUName, buddy, setBuddy, examDt, setExamDt, phone, setPhone,
       // Timer
       tRun, tSubId, setTSubId, tSec, startTimer, pauseTimer, stopTimerAndSave, addManualLog,
     }}>

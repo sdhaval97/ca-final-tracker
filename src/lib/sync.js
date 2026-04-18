@@ -12,10 +12,10 @@ export async function fetchProfile(userId) {
   return data;
 }
 
-export async function upsertProfile(userId, { name, examDate }) {
+export async function upsertProfile(userId, { name, examDate, phone }) {
   const { error } = await supabase
     .from('profiles')
-    .upsert({ id: userId, name, exam_date: examDate ?? '', updated_at: new Date().toISOString() });
+    .upsert({ id: userId, name, exam_date: examDate ?? '', phone: phone ?? null, updated_at: new Date().toISOString() });
   if (error) throw error;
 }
 

@@ -56,7 +56,7 @@ function StatCard({ label, value }) {
 export function Profile() {
   const {
     authUser, signOut, saveProfile,
-    uName, examDt,
+    uName, examDt, phone,
     log, chS, streak,
   } = useStudy();
 
@@ -64,6 +64,7 @@ export function Profile() {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(uName);
   const [editExam, setEditExam] = useState(examDt);
+  const [editPhone, setEditPhone] = useState(phone);
   // Auth events
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -102,7 +103,7 @@ export function Profile() {
   const handleSaveProfile = () => {
     if (!editName.trim()) return;
     setEditing(false);
-    saveProfile(editName.trim(), editExam); // state updates synchronously; network call runs in background
+    saveProfile(editName.trim(), editExam, editPhone.trim() || null);
   };
 
   const handleReset = () => {
@@ -136,11 +137,18 @@ export function Profile() {
                   onChange={e => setEditExam(e.target.value)}
                   className="bg-bg3 border border-brd rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-b4 w-full"
                 />
+                <input
+                  type="tel"
+                  placeholder="Phone (optional)"
+                  value={editPhone}
+                  onChange={e => setEditPhone(e.target.value)}
+                  className="bg-bg3 border border-brd rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-b4 w-full"
+                />
                 <div className="flex gap-2 mt-1">
                   <Button onClick={handleSaveProfile} className="py-1.5 px-4 text-xs rounded-full shadow-sB flex items-center gap-1.5">
                     <Check size={12} /> Save
                   </Button>
-                  <Button variant="secondary" onClick={() => { setEditing(false); setEditName(uName); setEditExam(examDt); }} className="py-1.5 px-4 text-xs rounded-full flex items-center gap-1.5">
+                  <Button variant="secondary" onClick={() => { setEditing(false); setEditName(uName); setEditExam(examDt); setEditPhone(phone); }} className="py-1.5 px-4 text-xs rounded-full flex items-center gap-1.5">
                     <X size={12} /> Cancel
                   </Button>
                 </div>
@@ -160,6 +168,7 @@ export function Profile() {
                   Member since {formatDate(authUser?.created_at)}
                   {examDt && <span className="ml-3">· Exam {formatDate(examDt)}</span>}
                 </p>
+                {phone && <p className="text-xs text-txM font-medium mt-0.5">{phone}</p>}
               </>
             )}
           </div>

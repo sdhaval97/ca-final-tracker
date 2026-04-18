@@ -11,8 +11,12 @@ CREATE TABLE IF NOT EXISTS profiles (
   id          UUID PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
   name        TEXT,
   exam_date   TEXT DEFAULT '',
+  phone       TEXT,
   updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: run this if the table already exists
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT;
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 

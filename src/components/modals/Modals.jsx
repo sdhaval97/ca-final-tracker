@@ -3,7 +3,7 @@ import { Button } from '../ui/Button';
 import { useStudy } from '../../context/StudyContext';
 import { SUBS } from '../../data/subjects';
 import { motion } from 'framer-motion';
-import { Mail, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, Phone, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const overlay = "fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex justify-center items-center p-4";
 const modalPane = "bg-bg2 border border-brd rounded-[24px] p-6 md:p-8 max-w-[460px] w-full shadow-s3 relative";
@@ -20,94 +20,314 @@ function ModalWrapper({ children, onClose }) {
   );
 }
 
+// ── Shared input component ────────────────────────────────────────────────────
+
+function Field({ icon: Icon, type = 'text', placeholder, value, onChange, onKeyDown, autoFocus, right }) {
+  return (
+    <div className="relative">
+      {Icon && <Icon size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txM pointer-events-none" />}
+      <input
+        autoFocus={autoFocus}
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        className={`w-full ${Icon ? 'pl-10' : 'pl-4'} ${right ? 'pr-10' : 'pr-4'} py-3 text-sm font-bold bg-bg3 border-2 border-brd rounded-xl outline-none focus:border-b4 transition-colors`}
+      />
+      {right}
+    </div>
+  );
+}
+
 // ── Auth Modal ────────────────────────────────────────────────────────────────
 
 export function AuthModal({ isOpen }) {
-  const { signIn } = useStudy();
-  const [email, setEmail] = useState('');
-  const [status, setStatus] = useState('idle'); // idle | loading | sent | error
-  const [errorMsg, setErrorMsg] = useState('');
+  const { signUp, signInWithPassword, resetPassword } = useStudy();
 
-  // Detect Supabase auth error redirects (e.g. expired magic link) and clean the URL
+  const [tab, setTab] = useState('login'); // login | register | forgot | check-email
+
+  // Login fields
+  const [lEmail, setLEmail] = useState('');
+  const [lPass, setLPass]   = useState('');
+  const [lShowP, setLShowP] = useState(false);
+
+  // Register fields
+  const [rFirst, setRFirst] = useState('');
+  const [rLast,  setRLast]  = useState('');
+  const [rEmail, setREmail] = useState('');
+  const [rPass,  setRPass]  = useState('');
+  const [rConf,  setRConf]  = useState('');
+  const [rPhone, setRPhone] = useState('');
+  const [rShowP, setRShowP] = useState(false);
+
+  // Forgot field
+  const [fEmail, setFEmail] = useState('');
+
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
+
+  // Clean URL hash on mount (handles expired-link redirects from old magic-link flow)
   React.useEffect(() => {
     const hash = window.location.hash;
     if (!hash.includes('error=')) return;
-    const params = new URLSearchParams(hash.slice(1));
-    const code = params.get('error_code');
-    if (code === 'otp_expired') {
-      setErrorMsg('That magic link has expired. Enter your email to get a new one.');
-    } else {
-      const desc = params.get('error_description');
-      setErrorMsg(desc ? desc.replace(/\+/g, ' ') : 'Sign-in failed. Please try again.');
-    }
     window.history.replaceState(null, '', window.location.pathname);
   }, []);
 
   if (!isOpen) return null;
 
-  const handleSend = async () => {
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMsg('Enter a valid email address.');
-      return;
-    }
-    setStatus('loading');
-    setErrorMsg('');
+  const err = (msg) => { setError(msg); setLoading(false); };
+
+  const handleLogin = async () => {
+    setError('');
+    if (!lEmail.trim() || !lEmail.includes('@')) return err('Enter a valid email address.');
+    if (!lPass) return err('Enter your password.');
+    setLoading(true);
     try {
-      await signIn(email.trim());
-      setStatus('sent');
+      await signInWithPassword(lEmail.trim(), lPass);
     } catch (e) {
-      setErrorMsg(e.message ?? 'Something went wrong. Try again.');
-      setStatus('error');
+      err(e.message ?? 'Sign-in failed. Check your email and password.');
     }
   };
 
+  const handleRegister = async () => {
+    setError('');
+    if (!rFirst.trim()) return err('Enter your first name.');
+    if (!rEmail.trim() || !rEmail.includes('@')) return err('Enter a valid email address.');
+    if (rPass.length < 8) return err('Password must be at least 8 characters.');
+    if (rPass !== rConf) return err('Passwords do not match.');
+    setLoading(true);
+    try {
+      const data = await signUp(rEmail.trim(), rPass, rFirst, rLast, rPhone.trim() || null);
+      // If Supabase requires email confirmation, session will be null
+      if (data?.user && !data.session) {
+        setTab('check-email');
+        setLoading(false);
+      }
+    } catch (e) {
+      err(e.message ?? 'Registration failed. Try again.');
+    }
+  };
+
+  const handleForgot = async () => {
+    setError('');
+    if (!fEmail.trim() || !fEmail.includes('@')) return err('Enter your email address.');
+    setLoading(true);
+    try {
+      await resetPassword(fEmail.trim());
+      setTab('check-email');
+      setLoading(false);
+    } catch (e) {
+      err(e.message ?? 'Could not send reset email. Try again.');
+    }
+  };
+
+  const inputCls = "w-full py-3 text-sm font-bold bg-bg3 border-2 border-brd rounded-xl outline-none focus:border-b4 transition-colors";
+  const tabBtn = (t, label) => (
+    <button
+      onClick={() => { setTab(t); setError(''); }}
+      className={`flex-1 py-2.5 text-sm font-black rounded-xl transition-colors ${tab === t ? 'bg-b6 text-white shadow-sB' : 'text-txM hover:text-tx'}`}
+    >{label}</button>
+  );
+
+  if (tab === 'check-email') return (
+    <ModalWrapper>
+      <div className="text-center">
+        <div className="text-5xl mb-4">📬</div>
+        <h2 className="text-xl font-black text-b9 mb-2">Check your inbox</h2>
+        <p className="text-sm text-txM font-medium mb-6">
+          We sent an email to <span className="font-black text-b6">{fEmail || rEmail}</span>.<br />
+          Follow the link to continue.
+        </p>
+        <Button variant="secondary" onClick={() => { setTab('login'); setError(''); }} className="w-full py-3 rounded-full text-sm">
+          Back to Sign In
+        </Button>
+      </div>
+    </ModalWrapper>
+  );
+
+  if (tab === 'forgot') return (
+    <ModalWrapper>
+      <div className="text-center mb-5">
+        <div className="text-4xl mb-3">🔑</div>
+        <h2 className="text-xl font-black text-b9 mb-1">Reset Password</h2>
+        <p className="text-xs text-txM font-medium">We'll email you a reset link.</p>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Field icon={Mail} type="email" placeholder="your@email.com" value={fEmail}
+          onChange={e => { setFEmail(e.target.value); setError(''); }}
+          onKeyDown={e => e.key === 'Enter' && handleForgot()} autoFocus />
+        {error && <p className="text-xs text-rose font-bold -mt-1">{error}</p>}
+        <Button onClick={handleForgot} disabled={loading} className="w-full py-3.5 rounded-full shadow-sB flex items-center justify-center gap-2">
+          {loading ? <><Loader2 size={15} className="animate-spin" /> Sending…</> : 'Send Reset Link →'}
+        </Button>
+        <button onClick={() => { setTab('login'); setError(''); }} className="text-xs text-txM font-bold hover:text-b6 transition-colors mt-1">
+          ← Back to Sign In
+        </button>
+      </div>
+    </ModalWrapper>
+  );
+
   return (
     <ModalWrapper>
-      {status === 'sent' ? (
-        <div className="text-center">
-          <div className="text-5xl mb-4">📬</div>
-          <h2 className="text-xl font-black text-b9 mb-2">Check your inbox</h2>
-          <p className="text-sm text-txM font-medium mb-2">
-            We sent a magic link to
-          </p>
-          <p className="text-sm font-black text-b6 mb-6 break-all">{email}</p>
-          <p className="text-xs text-txM font-medium mb-6">
-            Click the link in the email to sign in. You can close this tab.
-          </p>
-          <Button variant="secondary" onClick={() => setStatus('idle')} className="w-full py-3 rounded-full text-sm">
-            Use a different email
+      <div className="text-center mb-5">
+        <div className="text-4xl mb-2">🎓</div>
+        <h2 className="text-2xl font-black text-b9">CA Final Tracker</h2>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-bg3 rounded-xl p-1 mb-5">
+        {tabBtn('login', 'Sign In')}
+        {tabBtn('register', 'Create Account')}
+      </div>
+
+      {tab === 'login' && (
+        <div className="flex flex-col gap-3">
+          <Field icon={Mail} type="email" placeholder="your@email.com" value={lEmail}
+            onChange={e => { setLEmail(e.target.value); setError(''); }}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()} autoFocus />
+          <div className="relative">
+            <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txM pointer-events-none" />
+            <input type={lShowP ? 'text' : 'password'} placeholder="Password" value={lPass}
+              onChange={e => { setLPass(e.target.value); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              className={`${inputCls} pl-10 pr-10`} />
+            <button type="button" onClick={() => setLShowP(p => !p)}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-txM hover:text-b6">
+              {lShowP ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
+          {error && <p className="text-xs text-rose font-bold -mt-1">{error}</p>}
+          <Button onClick={handleLogin} disabled={loading} className="w-full py-3.5 rounded-full shadow-sB flex items-center justify-center gap-2">
+            {loading ? <><Loader2 size={15} className="animate-spin" /> Signing in…</> : 'Sign In →'}
           </Button>
+          <button onClick={() => { setTab('forgot'); setFEmail(lEmail); setError(''); }}
+            className="text-xs text-txM font-bold hover:text-b6 transition-colors text-center mt-1">
+            Forgot password?
+          </button>
+        </div>
+      )}
+
+      {tab === 'register' && (
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="relative">
+              <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txM pointer-events-none" />
+              <input type="text" placeholder="First name *" value={rFirst}
+                onChange={e => { setRFirst(e.target.value); setError(''); }} autoFocus
+                className={`${inputCls} pl-10 pr-4`} />
+            </div>
+            <div className="relative">
+              <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txM pointer-events-none" />
+              <input type="text" placeholder="Last name" value={rLast}
+                onChange={e => { setRLast(e.target.value); setError(''); }}
+                className={`${inputCls} pl-10 pr-4`} />
+            </div>
+          </div>
+          <Field icon={Mail} type="email" placeholder="Email *" value={rEmail}
+            onChange={e => { setREmail(e.target.value); setError(''); }} />
+          <div className="relative">
+            <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txM pointer-events-none" />
+            <input type={rShowP ? 'text' : 'password'} placeholder="Password * (min 8 chars)" value={rPass}
+              onChange={e => { setRPass(e.target.value); setError(''); }}
+              className={`${inputCls} pl-10 pr-10`} />
+            <button type="button" onClick={() => setRShowP(p => !p)}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-txM hover:text-b6">
+              {rShowP ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+          </div>
+          <div className="relative">
+            <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txM pointer-events-none" />
+            <input type="password" placeholder="Confirm password *" value={rConf}
+              onChange={e => { setRConf(e.target.value); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleRegister()}
+              className={`${inputCls} pl-10 pr-4`} />
+          </div>
+          <div className="relative">
+            <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txM pointer-events-none" />
+            <input type="tel" placeholder="Phone (optional)" value={rPhone}
+              onChange={e => { setRPhone(e.target.value); setError(''); }}
+              className={`${inputCls} pl-10 pr-4`} />
+          </div>
+          {error && <p className="text-xs text-rose font-bold -mt-1">{error}</p>}
+          <Button onClick={handleRegister} disabled={loading} className="w-full py-3.5 rounded-full shadow-sB flex items-center justify-center gap-2">
+            {loading ? <><Loader2 size={15} className="animate-spin" /> Creating account…</> : 'Create Account →'}
+          </Button>
+        </div>
+      )}
+    </ModalWrapper>
+  );
+}
+
+// ── Set Password Modal (shown after clicking a password-reset email link) ─────
+
+export function SetPasswordModal({ isOpen }) {
+  const { updatePassword } = useStudy();
+  const [pass,  setPass]  = useState('');
+  const [conf,  setConf]  = useState('');
+  const [showP, setShowP] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSet = async () => {
+    setError('');
+    if (pass.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (pass !== conf)   { setError('Passwords do not match.'); return; }
+    setLoading(true);
+    try {
+      await updatePassword(pass);
+      setDone(true);
+    } catch (e) {
+      setError(e.message ?? 'Failed to update password. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputCls = "w-full py-3 text-sm font-bold bg-bg3 border-2 border-brd rounded-xl outline-none focus:border-b4 transition-colors";
+
+  return (
+    <ModalWrapper>
+      {done ? (
+        <div className="text-center">
+          <div className="text-5xl mb-4">✅</div>
+          <h2 className="text-xl font-black text-b9 mb-2">Password Updated</h2>
+          <p className="text-sm text-txM font-medium">You're all set. You can now use your new password to sign in.</p>
         </div>
       ) : (
-        <div className="text-center">
-          <div className="text-5xl mb-4">🎓</div>
-          <h2 className="text-2xl font-black text-b9 mb-2">CA Final Tracker</h2>
-          <p className="text-sm text-txM font-medium mb-6">
-            Enter your email to sign in or create an account. No password needed.
-          </p>
-          <div className="relative mb-4">
-            <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-txM" />
-            <input
-              autoFocus
-              type="email"
-              placeholder="your@email.com"
-              value={email}
-              onChange={e => { setEmail(e.target.value); setErrorMsg(''); }}
-              onKeyDown={e => e.key === 'Enter' && handleSend()}
-              className="w-full pl-10 pr-4 py-4 text-sm font-bold bg-bg3 border-2 border-brd rounded-xl outline-none focus:border-b4"
-            />
+        <>
+          <div className="text-center mb-5">
+            <div className="text-4xl mb-2">🔐</div>
+            <h2 className="text-xl font-black text-b9 mb-1">Set New Password</h2>
+            <p className="text-xs text-txM font-medium">Choose a strong password for your account.</p>
           </div>
-          {errorMsg && (
-            <p className="text-xs text-rose font-bold mb-3 -mt-1">{errorMsg}</p>
-          )}
-          <Button onClick={handleSend} disabled={status === 'loading'} className="w-full py-4 text-base rounded-full shadow-sB flex items-center justify-center gap-2">
-            {status === 'loading' ? (
-              <><Loader2 size={16} className="animate-spin" /> Sending…</>
-            ) : (
-              'Send Magic Link →'
-            )}
-          </Button>
-        </div>
+          <div className="flex flex-col gap-3">
+            <div className="relative">
+              <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txM pointer-events-none" />
+              <input autoFocus type={showP ? 'text' : 'password'} placeholder="New password" value={pass}
+                onChange={e => { setPass(e.target.value); setError(''); }}
+                className={`${inputCls} pl-10 pr-10`} />
+              <button type="button" onClick={() => setShowP(p => !p)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-txM hover:text-b6">
+                {showP ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+            <div className="relative">
+              <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txM pointer-events-none" />
+              <input type="password" placeholder="Confirm new password" value={conf}
+                onChange={e => { setConf(e.target.value); setError(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleSet()}
+                className={`${inputCls} pl-10 pr-4`} />
+            </div>
+            {error && <p className="text-xs text-rose font-bold -mt-1">{error}</p>}
+            <Button onClick={handleSet} disabled={loading} className="w-full py-3.5 rounded-full shadow-sB flex items-center justify-center gap-2">
+              {loading ? <><Loader2 size={15} className="animate-spin" /> Updating…</> : 'Update Password →'}
+            </Button>
+          </div>
+        </>
       )}
     </ModalWrapper>
   );

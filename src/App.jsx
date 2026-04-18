@@ -14,6 +14,7 @@ import { Profile } from './views/Profile';
 
 import {
   AuthModal,
+  SetPasswordModal,
   WelcomeModal,
   DailyQuoteModal,
   BuddyModal,
@@ -22,7 +23,7 @@ import {
 import { useStudy } from './context/StudyContext';
 
 function AppContent() {
-  const { authUser, authLoading, uName } = useStudy();
+  const { authUser, authLoading, uName, isPasswordRecovery } = useStudy();
   const [activeTab, setActiveTab] = useState('dash');
 
   const [showWelcome, setShowWelcome] = useState(false);
@@ -55,10 +56,8 @@ function AppContent() {
     );
   }
 
-  // Gate the app behind auth
-  if (!authUser) {
-    return <AuthModal isOpen={true} />;
-  }
+  if (!authUser) return <AuthModal isOpen={true} />;
+  if (isPasswordRecovery) return <SetPasswordModal isOpen={true} />;
 
   return (
     <div className="flex flex-col min-h-screen">
