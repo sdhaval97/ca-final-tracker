@@ -1,14 +1,14 @@
-import React from 'react';
-import { BarChart3, BookOpen, Clock, Target, Gift, FileText, CheckSquare } from 'lucide-react';
+import { BarChart3, BookOpen, Clock, Target, Gift, FileText, CheckSquare, User } from 'lucide-react';
 
 const tabs = [
-  { id: 'dash', label: 'Dashboard', icon: BarChart3 },
-  { id: 'sub', label: 'Subjects', icon: BookOpen },
-  { id: 'tmr', label: 'Timer', icon: Clock },
-  { id: 'tgt', label: 'Targets', icon: Target },
-  { id: 'rw', label: 'Rewards', icon: Gift },
-  { id: 'lg', label: 'Log', icon: FileText },
-  { id: 'td', label: 'Tasks', icon: CheckSquare },
+  { id: 'dash',    label: 'Dashboard', icon: BarChart3 },
+  { id: 'sub',     label: 'Subjects',  icon: BookOpen },
+  { id: 'tmr',     label: 'Timer',     icon: Clock },
+  { id: 'tgt',     label: 'Targets',   icon: Target },
+  { id: 'rw',      label: 'Rewards',   icon: Gift },
+  { id: 'lg',      label: 'Log',       icon: FileText },
+  { id: 'td',      label: 'Tasks',     icon: CheckSquare },
+  { id: 'profile', label: 'Profile',   icon: User },
 ];
 
 export function Navigation({ activeTab, setActiveTab }) {
