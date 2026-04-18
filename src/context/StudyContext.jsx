@@ -99,10 +99,11 @@ export function StudyProvider({ children }) {
       if (event === 'INITIAL_SESSION') {
         clearTimeout(timeout);
         if (session?.user) {
-          // Verify the JWT is still valid (catches deleted-user stale sessions)
-          const { error: userError } = await supabase.auth.getUser();
-          if (userError) {
-            // Stale / revoked session — clear everything and show login
+          // refreshSession hits the server and requires the refresh token to still be valid.
+          // Supabase revokes refresh tokens when a user is deleted, so this catches ghost sessions
+          // even when the short-lived access token (JWT) hasn't expired yet.
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !refreshData?.session) {
             try { await supabase.auth.signOut(); } catch (_) {}
             ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex', 'bu'].forEach(k =>
               localStorage.removeItem('caf3_' + k)
@@ -110,8 +111,8 @@ export function StudyProvider({ children }) {
             setAuthLoading(false);
             return;
           }
-          await loadCloudData(session.user);
-          setAuthUser(session.user);
+          await loadCloudData(refreshData.session.user);
+          setAuthUser(refreshData.session.user);
         }
         setAuthLoading(false);
       } else if (event === 'SIGNED_IN') {
