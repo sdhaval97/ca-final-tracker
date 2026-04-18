@@ -63,7 +63,7 @@ export function StudyProvider({ children }) {
     isLoadingFromCloud.current = true;
     try {
       // Wipe stale local data before loading so the cloud is always the source of truth
-      ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex'].forEach(k =>
+      ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex', 'bu'].forEach(k =>
         localStorage.removeItem('caf3_' + k)
       );
 
@@ -181,6 +181,9 @@ export function StudyProvider({ children }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    ['log', 'ch', 'rv', 'td', 'tg', 'rw', 'str', 'ld', 'nm', 'ex', 'bu'].forEach(k =>
+      localStorage.removeItem('caf3_' + k)
+    );
     setAuthUser(null);
   };
 
