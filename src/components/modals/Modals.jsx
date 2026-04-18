@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '../ui/Button';
 import { useStudy } from '../../context/StudyContext';
 import { SUBS } from '../../data/subjects';
 import { motion } from 'framer-motion';
+import { Mail, Loader2 } from 'lucide-react';
 
 const overlay = "fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex justify-center items-center p-4";
 const modalPane = "bg-bg2 border border-brd rounded-[24px] p-6 md:p-8 max-w-[460px] w-full shadow-s3 relative";
@@ -19,18 +20,98 @@ function ModalWrapper({ children, onClose }) {
   );
 }
 
+// ── Auth Modal ────────────────────────────────────────────────────────────────
+
+export function AuthModal({ isOpen }) {
+  const { signIn } = useStudy();
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState('idle'); // idle | loading | sent | error
+  const [errorMsg, setErrorMsg] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSend = async () => {
+    if (!email.trim() || !email.includes('@')) {
+      setErrorMsg('Enter a valid email address.');
+      return;
+    }
+    setStatus('loading');
+    setErrorMsg('');
+    try {
+      await signIn(email.trim());
+      setStatus('sent');
+    } catch (e) {
+      setErrorMsg(e.message ?? 'Something went wrong. Try again.');
+      setStatus('error');
+    }
+  };
+
+  return (
+    <ModalWrapper>
+      {status === 'sent' ? (
+        <div className="text-center">
+          <div className="text-5xl mb-4">📬</div>
+          <h2 className="text-xl font-black text-b9 mb-2">Check your inbox</h2>
+          <p className="text-sm text-txM font-medium mb-2">
+            We sent a magic link to
+          </p>
+          <p className="text-sm font-black text-b6 mb-6 break-all">{email}</p>
+          <p className="text-xs text-txM font-medium mb-6">
+            Click the link in the email to sign in. You can close this tab.
+          </p>
+          <Button variant="secondary" onClick={() => setStatus('idle')} className="w-full py-3 rounded-full text-sm">
+            Use a different email
+          </Button>
+        </div>
+      ) : (
+        <div className="text-center">
+          <div className="text-5xl mb-4">🎓</div>
+          <h2 className="text-2xl font-black text-b9 mb-2">CA Final Tracker</h2>
+          <p className="text-sm text-txM font-medium mb-6">
+            Enter your email to sign in or create an account. No password needed.
+          </p>
+          <div className="relative mb-4">
+            <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-txM" />
+            <input
+              autoFocus
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setErrorMsg(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleSend()}
+              className="w-full pl-10 pr-4 py-4 text-sm font-bold bg-bg3 border-2 border-brd rounded-xl outline-none focus:border-b4"
+            />
+          </div>
+          {errorMsg && (
+            <p className="text-xs text-rose font-bold mb-3 -mt-1">{errorMsg}</p>
+          )}
+          <Button onClick={handleSend} disabled={status === 'loading'} className="w-full py-4 text-base rounded-full shadow-sB flex items-center justify-center gap-2">
+            {status === 'loading' ? (
+              <><Loader2 size={16} className="animate-spin" /> Sending…</>
+            ) : (
+              'Send Magic Link →'
+            )}
+          </Button>
+        </div>
+      )}
+    </ModalWrapper>
+  );
+}
+
+// ── Welcome Modal (name prompt after first sign-up) ───────────────────────────
+
 export function WelcomeModal({ isOpen, onClose }) {
-  const { uName, setUName } = useStudy();
+  const { saveProfile } = useStudy();
   const [name, setName] = useState('');
-  
+
   const handleSave = () => {
-    if(name.trim()) {
-      setUName(name.trim());
+    if (name.trim()) {
+      saveProfile(name.trim());
       onClose();
     }
   };
 
-  if(!isOpen) return null;
+  if (!isOpen) return null;
 
   return (
     <ModalWrapper>
@@ -38,11 +119,11 @@ export function WelcomeModal({ isOpen, onClose }) {
         <div className="text-5xl mb-4">🎓</div>
         <h2 className="text-2xl font-black text-b9 mb-2">Welcome to CA Tracker</h2>
         <p className="text-sm text-txM font-medium mb-6">Enter your name. We'll add the CA prefix — see it daily as motivation.</p>
-        <input 
+        <input
           autoFocus
           className="w-full text-center text-lg font-black bg-bg3 border-2 border-brd rounded-xl py-4 mb-4 outline-none focus:border-b4"
-          placeholder="Your name" value={name} onChange={e=>setName(e.target.value)}
-          onKeyDown={e=>e.key==='Enter' && handleSave()}
+          placeholder="Your name" value={name} onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSave()}
         />
         <Button onClick={handleSave} className="w-full py-4 text-base rounded-full shadow-sB">Start My Journey →</Button>
       </div>
