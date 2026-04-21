@@ -118,8 +118,8 @@ export function StudyProvider({ children }) {
         }
         setAuthLoading(false);
       } else if (event === 'SIGNED_IN') {
-        setAuthUser(session.user);
         await loadCloudData(session.user);
+        setAuthUser(session.user);
       } else if (event === 'PASSWORD_RECOVERY') {
         setAuthUser(session.user);
         setIsPasswordRecovery(true);
