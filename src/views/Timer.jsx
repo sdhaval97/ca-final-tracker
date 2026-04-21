@@ -56,7 +56,7 @@ export function Timer() {
         </div>
         
         <div className="text-sm text-txM font-bold mb-10 h-5">
-          {tRun ? `Studying: ${selectedSub?.name}` : tSec > 0 ? "Paused" : "Select a subject and start"}
+          {tRun ? `Studying: ${selectedSub?.name}` : tSec > 0 ? `Paused · ${selectedSub?.name}` : "Select a subject and start"}
         </div>
 
         <div className="flex justify-center gap-4">
