@@ -86,6 +86,7 @@ export function StudyProvider({ children }) {
       setRws(userData?.rewards ?? []);
       setStreak(userData?.streak ?? 0);
       setLastD(userData?.last_study_date ?? '');
+      setBuddy(userData?.buddy ?? null);
     } catch (e) {
       console.warn('Could not load cloud data, using local cache:', e.message);
     } finally {
@@ -141,12 +142,13 @@ export function StudyProvider({ children }) {
         await upsertUserData(authUser.id, {
           log, ch_states: chS, rv_states: rvS, todos,
           targets: tgs, rewards: rws, streak, last_study_date: lastD,
+          buddy,
         });
       } catch (e) {
         console.warn('Sync failed:', e.message);
       }
     }, 5000);
-  }, [authUser, log, chS, rvS, todos, tgs, rws, streak, lastD]);
+  }, [authUser, log, chS, rvS, todos, tgs, rws, streak, lastD, buddy]);
 
   useEffect(() => { syncToCloud(); }, [syncToCloud]);
 
@@ -169,6 +171,7 @@ export function StudyProvider({ children }) {
         upsertUserData(authUser.id, {
           log, ch_states: chS, rv_states: rvS, todos,
           targets: tgs, rewards: rws, streak, last_study_date: lastD,
+          buddy,
         });
       }
     };
@@ -213,6 +216,15 @@ export function StudyProvider({ children }) {
   };
 
   const signOut = async () => {
+    // Fire-and-forget flush so sign-out is instant; beforeunload also covers this
+    clearTimeout(syncDebounceRef.current);
+    if (authUser) {
+      upsertUserData(authUser.id, {
+        log, ch_states: chS, rv_states: rvS, todos,
+        targets: tgs, rewards: rws, streak, last_study_date: lastD,
+        buddy,
+      }).catch(() => {});
+    }
     try { await supabase.auth.signOut(); } catch { /* stale session */ }
     wipeLocal();
     setAuthUser(null);

@@ -39,8 +39,12 @@ CREATE TABLE IF NOT EXISTS user_data (
   rewards          JSONB    DEFAULT '[]',
   streak           INTEGER  DEFAULT 0,
   last_study_date  TEXT     DEFAULT '',
+  buddy            JSONB    DEFAULT NULL,
   updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: run this if the table already exists without the buddy column
+-- ALTER TABLE user_data ADD COLUMN IF NOT EXISTS buddy JSONB DEFAULT NULL;
 
 ALTER TABLE user_data ENABLE ROW LEVEL SECURITY;
 
