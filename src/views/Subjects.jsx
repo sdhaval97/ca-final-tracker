@@ -7,31 +7,31 @@ import { Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
 
-export function Subjects() {
+export function Subjects({ setTab }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-6 p-4 md:p-8 max-w-7xl mx-auto">
       <div>
         <div className="text-lg font-extrabold text-b9 mb-1">📚 Chapter-wise Tracking</div>
-        <p className="text-xs text-txM font-bold">Tick chapters · Use dots for revision tracking (up to 3)</p>
+        <p className="text-xs text-txM font-bold">Tick chapters · Use R1/R2/R3 badges for revision tracking</p>
       </div>
 
       <div>
         <h3 className="text-[11px] font-black uppercase tracking-[1.5px] text-b7 mb-3">Group I</h3>
         <div className="grid md:grid-cols-2 gap-4 mb-6">
-          {SUBS.filter(s => s.group === 1).map(s => <SubjectCard key={s.id} sub={s} />)}
+          {SUBS.filter(s => s.group === 1).map(s => <SubjectCard key={s.id} sub={s} setTab={setTab} />)}
         </div>
-        
+
         <h3 className="text-[11px] font-black uppercase tracking-[1.5px] text-ind mb-3">Group II</h3>
         <div className="grid md:grid-cols-2 gap-4">
-          {SUBS.filter(s => s.group === 2).map(s => <SubjectCard key={s.id} sub={s} />)}
+          {SUBS.filter(s => s.group === 2).map(s => <SubjectCard key={s.id} sub={s} setTab={setTab} />)}
         </div>
       </div>
     </motion.div>
   );
 }
 
-function SubjectCard({ sub }) {
-  const { chS, setChS, rvS, setRvS } = useStudy();
+function SubjectCard({ sub, setTab }) {
+  const { chS, setChS, rvS, setRvS, setTSubId } = useStudy();
   
   const total = sub.ch.length;
   const done = sub.ch.filter((_, i) => chS[`${sub.id}_${i}`]).length;
@@ -69,9 +69,19 @@ function SubjectCard({ sub }) {
           <div className={`text-sm font-black mb-1 ${theme.text}`}>{sub.name}</div>
           <div className="text-[11px] text-txM font-bold">{sub.code} · {total} chapters</div>
         </div>
-        <span className={`text-[10px] px-2.5 py-1 rounded-full font-black uppercase tracking-wider ${sub.group === 1 ? 'bg-b1 text-b7' : 'bg-indBg text-ind'}`}>
-          G{sub.group}
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-[10px] px-2.5 py-1 rounded-full font-black uppercase tracking-wider ${sub.group === 1 ? 'bg-b1 text-b7' : 'bg-indBg text-ind'}`}>
+            G{sub.group}
+          </span>
+          {setTab && (
+            <button
+              onClick={() => { setTSubId(sub.id); setTab('tmr'); }}
+              className={`text-[10px] px-2.5 py-1 rounded-full font-black uppercase tracking-wide ${theme.bg} text-white hover:opacity-80 transition-opacity`}
+            >
+              ▶ Start
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-4">
@@ -110,10 +120,18 @@ function SubjectCard({ sub }) {
                   </div>
                   <div className="flex gap-1 ml-auto shrink-0">
                     {[1, 2, 3].map(r => (
-                      <div 
-                        key={r} onClick={(e) => toggleRv(e, k, r)}
-                        className={`w-2.5 h-2.5 rounded-full border-[1.5px] cursor-pointer transition-all ${r <= rv ? 'bg-sky-500 border-sky-500 shadow-[0_0_5px_rgba(14,165,233,0.4)]' : 'border-slate-300 hover:border-sky-400'}`}
-                      />
+                      <button
+                        key={r}
+                        onClick={(e) => toggleRv(e, k, r)}
+                        title={`Mark ${r} revision${r > 1 ? 's' : ''}`}
+                        className={`w-6 h-6 rounded text-[9px] font-black cursor-pointer transition-all border ${
+                          r <= rv
+                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                            : 'border-brd text-txM hover:border-emerald-400 hover:text-emerald-500'
+                        }`}
+                      >
+                        R{r}
+                      </button>
                     ))}
                   </div>
                 </div>

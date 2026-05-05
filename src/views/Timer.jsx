@@ -3,11 +3,11 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useStudy } from '../context/StudyContext';
 import { SUBS } from '../data/subjects';
-import { Play, Pause, Square } from 'lucide-react';
+import { Play, Pause, Square, PenLine } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
 
-export function Timer() {
+export function Timer({ openManualMod }) {
   const { tRun, tSubId, setTSubId, tSec, startTimer, pauseTimer, stopTimerAndSave, log } = useStudy();
 
   const h = String(Math.floor(tSec / 3600)).padStart(2, '0');
@@ -32,54 +32,93 @@ export function Timer() {
   }
 
   const selectedSub = SUBS.find(sub => sub.id === tSubId);
+  const isActive = tRun || tSec > 0;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-6 p-4 md:p-8 max-w-4xl mx-auto">
-      <Card className="text-center py-12 px-6">
-        <div className="text-lg font-extrabold text-b9 mb-2 flex items-center justify-center gap-2">
-          ⏱️ Study Timer
-        </div>
-        <p className="text-xs text-txM font-bold mb-8">Timer runs in background while you watch lectures</p>
-        
-        <select 
-          value={tSubId} 
-          disabled={tRun || tSec > 0} 
-          onChange={e => setTSubId(e.target.value)}
-          className="bg-bg3 border-2 border-brd text-tx px-5 py-3 rounded-full text-sm font-bold min-w-[300px] mb-8 outline-none focus:border-b4 disabled:opacity-50"
-        >
-          <option value="">— Select Subject —</option>
-          {SUBS.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
-        </select>
 
-        <div className="text-[64px] md:text-[84px] font-black tabular-nums bg-gradient-to-br from-b7 to-ind bg-clip-text text-transparent leading-none mb-3 tracking-tighter">
-          {h}:{m}:{s}
-        </div>
-        
-        <div className="text-sm text-txM font-bold mb-10 h-5">
-          {tRun ? `Studying: ${selectedSub?.name}` : tSec > 0 ? `Paused · ${selectedSub?.name}` : "Select a subject and start"}
+      <section className="bg-bg2 border border-brd rounded-2xl overflow-hidden shadow-s2">
+        <div className="bg-gradient-to-br from-b9 via-b7 to-b6 px-6 pt-8 pb-6 text-white relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(99,102,241,0.3)_0%,transparent_60%)] pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col items-center gap-4">
+            <div className="flex items-center justify-between w-full gap-3">
+              <select
+                value={tSubId}
+                disabled={isActive}
+                onChange={e => setTSubId(e.target.value)}
+                className="flex-1 bg-white/10 border border-white/25 text-white px-4 py-2.5 rounded-xl text-sm font-bold outline-none focus:border-white/60 disabled:opacity-50 transition-colors"
+              >
+                <option value="" className="text-tx bg-bg2">— Select Subject —</option>
+                {SUBS.map(sub => (
+                  <option key={sub.id} value={sub.id} className="text-tx bg-bg2">{sub.name}</option>
+                ))}
+              </select>
+
+              {openManualMod && (
+                <button
+                  onClick={openManualMod}
+                  className="flex items-center gap-1.5 bg-white/10 border border-white/25 text-white px-3 py-2.5 rounded-xl text-xs font-bold hover:bg-white/20 transition-colors shrink-0"
+                >
+                  <PenLine size={13} /> Manual Log
+                </button>
+              )}
+            </div>
+
+            <div
+              data-timer-display
+              className="text-[72px] md:text-[96px] font-black tabular-nums leading-none tracking-tighter text-white drop-shadow-lg"
+            >
+              {h}:{m}:{s}
+            </div>
+
+            <div className="text-sm font-bold text-white/70 h-5 text-center">
+              {tRun
+                ? `Studying · ${selectedSub?.name}`
+                : tSec > 0
+                  ? `Paused · ${selectedSub?.name}`
+                  : 'Select a subject and start'}
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              {!tRun ? (
+                <button
+                  onClick={() => {
+                    if (!tSubId) alert('Select a subject first!');
+                    else startTimer(tSubId);
+                  }}
+                  className="flex items-center gap-2 bg-white text-b7 px-8 py-3 rounded-xl text-sm font-black hover:bg-white/90 transition-colors shadow-lg"
+                >
+                  <Play size={16} fill="currentColor" /> {tSec > 0 ? 'Resume' : 'Start'}
+                </button>
+              ) : (
+                <button
+                  onClick={pauseTimer}
+                  className="flex items-center gap-2 bg-white/15 border border-white/30 text-white px-8 py-3 rounded-xl text-sm font-black hover:bg-white/25 transition-colors"
+                >
+                  <Pause size={16} fill="currentColor" /> Pause
+                </button>
+              )}
+
+              {tSec > 0 && (
+                <button
+                  onClick={onStop}
+                  className="flex items-center gap-2 bg-rose-500/80 border border-rose-400/50 text-white px-6 py-3 rounded-xl text-sm font-black hover:bg-rose-500 transition-colors"
+                >
+                  <Square size={14} fill="currentColor" /> Stop & Save
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="flex justify-center gap-4">
-          {!tRun ? (
-            <Button variant="success" onClick={() => {
-              if(!tSubId) alert('Select a subject first!');
-              else startTimer(tSubId);
-            }} className="px-8 py-3.5 text-base rounded-full">
-              <Play size={18}/> {tSec > 0 ? 'Resume' : 'Start'}
-            </Button>
-          ) : (
-            <Button variant="warning" onClick={pauseTimer} className="px-8 py-3.5 text-base rounded-full">
-              <Pause fill="currentColor" size={18}/> Pause
-            </Button>
-          )}
-
-          {tSec > 0 && (
-            <Button variant="destructive" onClick={onStop} className="px-6 py-3.5 text-base rounded-full border-rose-200">
-              <Square fill="currentColor" size={16}/> Stop & Save
-            </Button>
-          )}
-        </div>
-      </Card>
+        {totalToday > 0 && (
+          <div className="px-6 py-3 bg-b1/50 border-t border-brd flex items-center justify-between">
+            <span className="text-[11px] text-txM font-bold uppercase tracking-wider">Today's total</span>
+            <span className="text-sm font-black text-b7">{fH(totalToday)}</span>
+          </div>
+        )}
+      </section>
 
       <Card>
         <div className="text-[15px] font-extrabold text-b9 mb-4">📋 Today's Sessions</div>
@@ -88,20 +127,17 @@ export function Timer() {
             No sessions today. Start one above!
           </div>
         ) : (
-          <div>
-            <div className="text-xs text-tx2 font-bold mb-4">Total: <span className="text-b6 font-black">{fH(totalToday)}</span></div>
-            <div className="space-y-2">
-              {todaySessions.map(l => {
-                const sub = SUBS.find(s => s.id === l.subjectId);
-                return (
-                  <div key={l.id} className="flex items-center gap-3 p-3 bg-bg3 rounded-xl hover:bg-bgH transition-colors">
-                    <div className="flex-1 text-xs font-bold truncate text-tx">{sub?.name || l.subjectId}</div>
-                    <div className="font-black text-xs">{fH(l.minutes)}</div>
-                    <div className="text-[10px] text-txM font-bold w-12 text-right">{l.time}</div>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="space-y-2">
+            {todaySessions.map(l => {
+              const sub = SUBS.find(s => s.id === l.subjectId);
+              return (
+                <div key={l.id} className="flex items-center gap-3 p-3 bg-bg3 rounded-xl hover:bg-bgH transition-colors">
+                  <div className="flex-1 text-xs font-bold truncate text-tx">{sub?.name || l.subjectId}</div>
+                  <div className="font-black text-xs">{fH(l.minutes)}</div>
+                  <div className="text-[10px] text-txM font-bold w-12 text-right">{l.time}</div>
+                </div>
+              );
+            })}
           </div>
         )}
       </Card>

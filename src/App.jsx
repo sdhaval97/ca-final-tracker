@@ -66,8 +66,8 @@ function AppContent() {
 
       <main className="flex-1 max-w-[1600px] w-full mx-auto relative overflow-hidden pb-20 md:pb-8">
         {activeTab === 'dash'    && <Dashboard />}
-        {activeTab === 'sub'     && <Subjects />}
-        {activeTab === 'tmr'     && <Timer />}
+        {activeTab === 'sub'     && <Subjects setTab={setActiveTab} />}
+        {activeTab === 'tmr'     && <Timer openManualMod={() => setShowManual(true)} />}
         {activeTab === 'tgt'     && <TargetsView />}
         {activeTab === 'rw'      && <Rewards />}
         {activeTab === 'lg'      && <StudyLog openManualMod={() => setShowManual(true)} />}
